@@ -4,11 +4,7 @@
 #include <time.h>
 #include <conio.h>
 
-#ifdef SAS_WINDOWS
-	#include <windows.h>
-#else
-	#error "Swords and Sandals only supports Windows"
-#endif
+#include <windows.h>
 
 /// Random
 void Random_Init()
