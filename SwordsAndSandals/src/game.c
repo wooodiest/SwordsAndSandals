@@ -705,6 +705,12 @@ int DrawFightScreen(Enemy enemy)
 					attack *= Random_Float(Random_Float(0.5f, 0.9f), Random_Float(1.1f, 1.5f));
 					attack += 1;
 
+					if (s_Player.Stats.Attack > 20)
+					{
+						if (Random_Float(0.0f, 100.0f) <= 20)
+							s_Player.Stats.Attack -= Random_Int(1, 3);
+					}
+
 					enemy.Stats.Health -= (int)attack;
 
 					if (enemy.Stats.Health <= 0)
