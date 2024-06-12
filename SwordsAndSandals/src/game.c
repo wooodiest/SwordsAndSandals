@@ -925,7 +925,7 @@ Enemy CreateEnemy()
 	float multiplier = 1 + (float)s_Level.Time / 60.0f;
 
 	enemy.Stats.Attack = (int)(5.0 * multiplier * Random_Float(0.8f, 1.2f));
-	enemy.Stats.Health = (int)(5.0 * multiplier * Random_Float(0.8f, 1.2f));
+	enemy.Stats.Health = (int)(10.0 * multiplier * Random_Float(0.8f, 1.2f));
 
 	enemy.Type = (EnemyType)(Random_Int(0, 3));
 
