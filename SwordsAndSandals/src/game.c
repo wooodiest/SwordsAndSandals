@@ -159,6 +159,8 @@ typedef struct Enemy
 
 	Statistics Stats;
 
+	int (*GetAttack)(Enemy);
+
 } Enemy;
 
 
@@ -563,6 +565,64 @@ void PrizeToChoose()
 
 // Fight
 
+int GetEnemyAttack1(Enemy enemy)
+{
+	float attack = enemy.Stats.Attack;
+
+	switch (enemy.Type)
+	{
+		case EnemyType_Ordinary:
+		{
+			attack *= Random_Float(0.9f, 1.0f);
+			break;
+		}
+		case EnemyType_Warrior:
+		{
+			attack *= Random_Float(0.7f, 3.0f);
+			break;
+		}
+		case EnemyType_Assasin:
+		{
+			attack *= Random_Float(0.4f, 4.0f);
+			break;
+		}
+	}
+
+	attack *= Random_Float(0.7f, 1.3f);
+	attack += 1;
+
+	return (int)attack;
+}
+
+int GetEnemyAttack2(Enemy enemy)
+{
+	float attack = enemy.Stats.Attack;
+
+	switch (enemy.Type)
+	{
+		case EnemyType_Ordinary:
+		{
+			attack *= Random_Float(0.9f, 1.0f);
+			break;
+		}
+		case EnemyType_Warrior:
+		{
+			attack *= Random_Float(0.7f, 2.5f);
+			break;
+		}
+		case EnemyType_Assasin:
+		{
+			attack *= Random_Float(0.4f, 2.0f);
+			break;
+		}
+	}
+
+	attack *= Random_Float(0.5f, 1.6f);
+	attack += 1;
+
+	return (int)attack;
+}
+
 int DrawFightScreen(Enemy enemy)
 {
 	int playerBaseHealth = s_Player.Stats.Health;
@@ -705,12 +765,6 @@ int DrawFightScreen(Enemy enemy)
 					attack *= Random_Float(Random_Float(0.5f, 0.9f), Random_Float(1.1f, 1.5f));
 					attack += 1;
 
-					if (s_Player.Stats.Attack > 20)
-					{
-						if (Random_Float(0.0f, 100.0f) <= 20)
-							s_Player.Stats.Attack -= Random_Int(1, 3);
-					}
-
 					enemy.Stats.Health -= (int)attack;
 
 					if (enemy.Stats.Health <= 0)
@@ -723,32 +777,7 @@ int DrawFightScreen(Enemy enemy)
 
 				// Enemy performs attack
 				{
-					float attack = enemy.Stats.Attack;
-
-					switch (enemy.Type)
-					{
-						case EnemyType_Ordinary:
-						{
-							attack *= Random_Float(0.9f, 1.0f);
-							break;
-						}
-						case EnemyType_Warrior:
-						{
-							attack *= Random_Float(0.7f, 3.0f);
-							break;
-						}
-						case EnemyType_Assasin:
-						{
-							attack *= Random_Float(0.4f, 6.0f);
-							break;
-						}
-					}
-
-					attack *= Random_Float(0.7f, 1.3f);
-					attack += 1;
-
-
-					s_Player.Stats.Health -= (int)attack;
+					s_Player.Stats.Health -= (int)enemy.GetAttack(enemy);
 
 					if (s_Player.Stats.Health <= 0)
 					{
@@ -928,12 +957,16 @@ Enemy CreateEnemy()
 {
 	Enemy enemy;
 
-	float multiplier = 1 + (float)s_Level.Time / 60.0f;
+	float multiplier = 1 + (float)s_Level.Time / 20.0f;
 
 	enemy.Stats.Attack = (int)(5.0 * multiplier * Random_Float(0.8f, 1.2f));
 	enemy.Stats.Health = (int)(10.0 * multiplier * Random_Float(0.8f, 1.2f));
 
 	enemy.Type = (EnemyType)(Random_Int(0, 3));
+	if (Random_Int(0, 1) == 1)
+		enemy.GetAttack = GetEnemyAttack1;
+	else
+		enemy.GetAttack = GetEnemyAttack2;
 
 	switch (enemy.Type)
 	{
