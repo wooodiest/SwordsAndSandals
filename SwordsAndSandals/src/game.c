@@ -125,6 +125,21 @@ Statistics Add(Statistics s1, Statistics s2)
 	return s1;
 }
 
+typedef struct Item
+{
+	Statistics Stats;
+	char*      Name;
+
+} Item;
+
+#define BACKPACK_SIZE 3
+
+typedef struct Backpack
+{
+	Item* Items[BACKPACK_SIZE];
+
+} Backpack;
+
 typedef enum EnemyType
 {
 	EnemyType_None,
@@ -190,6 +205,8 @@ typedef struct Player
 {
 	Statistics Stats;
 
+	Backpack Backpack;
+
 	int Points;
 
 	int PositionX;
@@ -204,6 +221,20 @@ static const char* s_LevelPath = "assets/example_level.sasmap";
 
 static const int s_RandomEventTimeStep    = 5;
 static float     s_RandomEventCurrentTime = 0.0f;
+
+
+Statistics GetPlayerStats()
+{
+	Statistics stats = s_Player.Stats;
+
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+	{
+		if (s_Player.Backpack.Items[i])
+			stats = Add(stats, s_Player.Backpack.Items[i]->Stats);	
+	}
+
+	return stats;
+}
 
 // Map
 int CheckPosition(MapData* map, int x, int y)
@@ -497,6 +528,50 @@ void ShowPrizeTypeWeapon(int top, const char* name, int attack, int health)
 
 }
 
+Item* CreateRandomItem()
+{
+	Item* item = malloc(sizeof(Item));
+
+	item->Name = s_Weapons[Random_Int(0, 49)];
+
+	float multiplier = 1 + (float)s_Level.Time / 40.0f;
+
+	item->Stats.Attack = (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f));
+	item->Stats.Health = (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f));
+
+	return item;
+}
+
+int AddToBackpack(Backpack* backpack, Item* item)
+{
+	// Check for empty slots
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+	{
+		if (backpack->Items[i] == NULL)
+		{
+			backpack->Items[i] = item;
+			return 1;
+		}
+	}
+
+	// Check for lower stats
+	int stats = item->Stats.Attack + item->Stats.Health;
+
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+	{
+		int currentStats = backpack->Items[i]->Stats.Attack + backpack->Items[i]->Stats.Health;
+		
+		if (stats >= currentStats)
+		{
+			free(backpack->Items[i]);
+			backpack->Items[i] = item;
+			return 1;
+		}
+	}
+
+	return 0;
+}
+
 void PrizeToChoose()
 {
 	ClearDrawingData();
@@ -516,16 +591,11 @@ void PrizeToChoose()
 		}
 	}
 
-	int weapon1 = Random_Int(0, 49);
-	int weapon2 = Random_Int(0, 49);
+	Item* item1 = CreateRandomItem();
+	Item* item2 = CreateRandomItem();
 
-	float multiplier = 1 + (float)s_Level.Time / 60.0f;
-
-	Statistics stats1 = { (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f)), (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f)) };
-	Statistics stats2 = { (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f)), (int)(Random_Float(1.0, 10.0f) * multiplier * Random_Float(0.7f, 1.3f)) };
-
-	ShowPrizeTypeWeapon(1, s_Weapons[weapon1], stats1.Attack, stats1.Health);
-	ShowPrizeTypeWeapon(0, s_Weapons[weapon2], stats2.Attack, stats2.Health);
+	ShowPrizeTypeWeapon(1, item1->Name, item1->Stats.Attack, item1->Stats.Health);
+	ShowPrizeTypeWeapon(0, item2->Name, item2->Stats.Attack, item2->Stats.Health);
 
 	char choosePrize[] = "Choose prize";
 	DrawCharPointer(choosePrize, s_DrawingData.Width / 2 - strlen(choosePrize) / 2, 0);
@@ -538,7 +608,18 @@ void PrizeToChoose()
 
 	DrawDrawingData();
 
+	printf("\n");
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+	{
+		if (s_Player.Backpack.Items[i])
+			printf("[%d] - %s: Attack: %d, Health: %d\n", i + 1, s_Player.Backpack.Items[i]->Name, s_Player.Backpack.Items[i]->Stats.Attack, s_Player.Backpack.Items[i]->Stats.Health);
+		else
+			printf("[%d] - ...\n", i + 1);	
+	}
+
 	int cond = 1;
+	Item* newItem;
+
 	while (cond)
 	{
 		if (_kbhit())
@@ -547,19 +628,38 @@ void PrizeToChoose()
 
 			if (key == 'p')
 			{
-				s_Player.Stats = Add(s_Player.Stats, stats1);
+				newItem = item1;
 
 				cond = 0;
 			}
 			else if (key == 'l')
 			{
-				s_Player.Stats = Add(s_Player.Stats, stats2);
+				newItem = item2;
 
 				cond = 0;
 			}
 		}
 	}
 
+	if (newItem == item1)
+	{
+		if (!AddToBackpack(&s_Player.Backpack, item1))
+			free(item1);
+		free(item2);
+	}
+	else if (newItem == item2)
+	{
+		if (!AddToBackpack(&s_Player.Backpack, item2))
+			free(item2);
+		free(item1);
+	}
+	else
+	{
+		free(item1);
+		free(item2);
+	}
+
+	system("cls");
 	ClearConsole();
 }
 
@@ -625,10 +725,11 @@ int GetEnemyAttack2(Enemy enemy)
 
 int DrawFightScreen(Enemy enemy)
 {
-	int playerBaseHealth = s_Player.Stats.Health;
+	Statistics playerStats = GetPlayerStats();
+	int playerBaseHealth = playerStats.Health;
 	int enemyBaseHealth  = enemy.Stats.Health;
 
-	while (s_Player.Stats.Health > 0 && enemy.Stats.Health > 0)
+	while (playerStats.Health > 0 && enemy.Stats.Health > 0)
 	{
 		ClearDrawingData();
 
@@ -636,7 +737,7 @@ int DrawFightScreen(Enemy enemy)
 		{
 			// player
 			{
-				int healthValue = (float)s_Player.Stats.Health / (float)playerBaseHealth * 20.0f;
+				int healthValue = (float)playerStats.Health / (float)playerBaseHealth * 20.0f;
 
 				for (int i = 0; i < healthValue; i++)
 					DrawChar('#', i + 1, 1);
@@ -645,13 +746,13 @@ int DrawFightScreen(Enemy enemy)
 				DrawCharPointer(healthText, 1, 2);
 
 				char charBuffer[10];
-				sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Player.Stats.Health);
+				sprintf_s(charBuffer, sizeof(charBuffer), "%d", playerStats.Health);
 				DrawCharPointer(charBuffer, strlen(healthText) + 1, 2);
 
 				char attackText[] = "Attack: ";
 				DrawCharPointer(attackText, 1, 3);
 
-				sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Player.Stats.Attack);
+				sprintf_s(charBuffer, sizeof(charBuffer), "%d", playerStats.Attack);
 				DrawCharPointer(charBuffer, strlen(attackText) + 1, 3);
 			}
 
@@ -722,7 +823,7 @@ int DrawFightScreen(Enemy enemy)
 
 				// Player performs attack
 				{
-					float attack = s_Player.Stats.Attack;
+					float attack = playerStats.Attack;
 
 					switch (attackType)
 					{
@@ -777,9 +878,9 @@ int DrawFightScreen(Enemy enemy)
 
 				// Enemy performs attack
 				{
-					s_Player.Stats.Health -= (int)enemy.GetAttack(enemy);
+					playerStats.Health -= (int)enemy.GetAttack(enemy);
 
-					if (s_Player.Stats.Health <= 0)
+					if (playerStats.Health <= 0)
 					{
 						ClearConsole();
 						return 0;
@@ -833,22 +934,7 @@ void PlayerOnUpdate(float dt)
 
 					break;
 				}
-				case '<': {
-					s_Player.Stats.Health -= 3;
 
-					if (s_Player.Stats.Health <= 0)
-						DrawEndScreen();
-					
-					break;
-				}
-				case '>': {
-					s_Player.Stats.Health -= 3;
-
-					if (s_Player.Stats.Health <= 0)
-						DrawEndScreen();
-					
-					break;
-				}
 				case '.': {
 					s_Player.PositionX = newPositionX;
 					s_Player.PositionY = newPositionY;
@@ -1066,6 +1152,9 @@ void LoadLevel()
 	s_Player.Stats.Health = Random_Int(10, 20);
 	s_Player.Stats.Attack = Random_Int(1, 3);
 
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+		s_Player.Backpack.Items[i] = NULL;
+
 	s_Level.Map   = Load(s_LevelPath);
 	s_Level.Time  = 0.0f;
 	s_Level.Kills = 0;
@@ -1092,6 +1181,15 @@ void LevelShutDown()
 	{
 		free(s_Level.Enemies);
 		s_Level.Enemies = NULL;
+	}
+
+	for (int i = 0; i < BACKPACK_SIZE; i++)
+	{
+		if (s_Player.Backpack.Items[i] != NULL)
+		{
+			free(s_Player.Backpack.Items[i]);
+			s_Player.Backpack.Items[i] = NULL;
+		}
 	}
 }
 
@@ -1138,14 +1236,16 @@ void DrawUI()
 		int  posX      = 0;
 		int  charCount = 0;
 
+		Statistics playerStats = GetPlayerStats();
+
 		{
 			char text[] = "Health: ";
 			charCount = sizeof(text) / sizeof(char) - 1;
 			DrawCharPointer(text, posX, 0);
 			posX += charCount;
 
-			charCount = GetNumCount(s_Player.Stats.Health);
-			sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Player.Stats.Health);
+			charCount = GetNumCount(playerStats.Health);
+			sprintf_s(charBuffer, sizeof(charBuffer), "%d", playerStats.Health);
 			DrawCharPointer(charBuffer, posX, 0);
 			posX += charCount;
 		}
@@ -1158,8 +1258,8 @@ void DrawUI()
 			DrawCharPointer(text, posX, 0);
 			posX += charCount;
 
-			charCount = GetNumCount(s_Player.Stats.Attack);
-			sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Player.Stats.Attack);
+			charCount = GetNumCount(playerStats.Attack);
+			sprintf_s(charBuffer, sizeof(charBuffer), "%d", playerStats.Attack);
 			DrawCharPointer(charBuffer, posX, 0);
 			posX += charCount;
 		}	
