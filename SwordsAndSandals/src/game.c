@@ -218,6 +218,7 @@ static Player s_Player;
 static int    s_Running = 1;
 static Level  s_Level;
 static const char* s_LevelPath = "assets/example_level.sasmap";
+static const char* s_StatsPath = "stats.sas";
 
 static const int s_RandomEventTimeStep    = 5;
 static float     s_RandomEventCurrentTime = 0.0f;
@@ -1150,7 +1151,7 @@ void LoadLevel()
 {
 	s_Player.Points       = 0;
 	s_Player.Stats.Health = Random_Int(10, 20);
-	s_Player.Stats.Attack = Random_Int(1, 3);
+	s_Player.Stats.Attack = Random_Int(3, 8);
 
 	for (int i = 0; i < BACKPACK_SIZE; i++)
 		s_Player.Backpack.Items[i] = NULL;
@@ -1280,34 +1281,102 @@ void DrawEndScreen()
 	DrawCharPointer(s_GameOverText, 0, 0);
 
 	{
-		char text[] = "Points: ";
+		char text[] = "Statistics: (top)";
 		DrawCharPointer(text, 0, 14);
+	}
+
+	int topPoints = 0, topTime = 0, topKills = 0;
+	// Load
+	{
+		FILE* file = fopen(s_StatsPath, "r");
+		if (file)
+		{
+			fscanf(file, "%d %d %d", &topPoints, &topTime, &topKills);
+			fclose(file);
+		}
+	}
+
+	{
+		char text[] = "Points: ";
+		int xOffset = strlen(text);
+
+		DrawCharPointer(text, 0, 15);
 
 		char charBuffer[10];
 		sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Player.Points);
-		DrawCharPointer(charBuffer, strlen(text), 14);
+		DrawCharPointer(charBuffer, strlen(text), 15);
+
+		xOffset += GetNumCount(s_Player.Points) + 1;
+
+		sprintf_s(charBuffer, sizeof(charBuffer), "%d", topPoints);
+		DrawChar('(', xOffset, 15);
+
+		xOffset += 1;
+		DrawCharPointer(charBuffer, xOffset, 15);
+
+		xOffset += GetNumCount(topPoints);
+		DrawChar(')', xOffset, 15);
 	}
 
 	{
 		char text[] = "Kills: ";
-		DrawCharPointer(text, 0, 15);
+		int xOffset = 8;
+		DrawCharPointer(text, 0, 16);
 
 		char charBuffer[10];
 		sprintf_s(charBuffer, sizeof(charBuffer), "%d", s_Level.Kills);
-		DrawCharPointer(charBuffer, strlen(text), 15);
+		DrawCharPointer(charBuffer, 8, 16);
+
+		xOffset += GetNumCount(s_Level.Kills) + 1;
+
+		sprintf_s(charBuffer, sizeof(charBuffer), "%d", topKills);
+		DrawChar('(', xOffset, 16);
+
+		xOffset += 1;
+		DrawCharPointer(charBuffer, xOffset, 16);
+
+		xOffset += GetNumCount(topKills);
+		DrawChar(')', xOffset, 16);
+
 	}
 
 	{
 		char text[] = "Time: ";
-		DrawCharPointer(text, 0, 16);
+		int xOffset = 8;
+		DrawCharPointer(text, 0, 17);
 
 		char charBuffer[10];
 		int time = (int)s_Level.Time;
 		sprintf_s(charBuffer, sizeof(charBuffer), "%d", time);
-		DrawCharPointer(charBuffer, strlen(text), 16);
+		DrawCharPointer(charBuffer, 8, 17);
+
+		xOffset += GetNumCount(s_Level.Time) + 1;
+
+		sprintf_s(charBuffer, sizeof(charBuffer), "%d", topTime);
+		DrawChar('(', xOffset, 17);
+
+		xOffset += 1;
+		DrawCharPointer(charBuffer, xOffset, 17);
+
+		xOffset += GetNumCount(topTime);
+		DrawChar(')', xOffset, 17);
+
 	}
 
-	DrawCharPointer("Press q to quit, c to continue", 0, 18);
+	// Save
+	{
+		if (s_Player.Points >= topPoints)
+		{
+			FILE* file = fopen(s_StatsPath, "w");
+			if (file)
+			{
+				fprintf(file, "%d %d %d", s_Player.Points, (int)s_Level.Time, s_Level.Kills);
+				fclose(file);
+			}
+		}	
+	}
+
+	DrawCharPointer("Press q to quit, c to continue", 0, 19);
 
 	DrawDrawingData();
 
